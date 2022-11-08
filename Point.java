@@ -4,6 +4,7 @@ import java.util.Stack;
 
 public class Point implements Comparable<Point> {
     public Stack<Line> lines;
+
     public int x;
     public int y;
 
@@ -48,4 +49,5 @@ public class Point implements Comparable<Point> {
     public int compareTo(Point x) {
         return this.y - x.y;
     }
+
 }
