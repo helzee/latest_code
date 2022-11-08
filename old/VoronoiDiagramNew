@@ -1,0 +1,215 @@
+import java.util.Collections;
+import java.util.Vector;
+import java.util.PriorityQueue;
+import java.util.Comparator;
+
+public class VoronoiDiagram {
+	public VoronoiDiagram(int size_x, int size_y, Vector<Point> points) {
+		divide(size_x, size_y, points, 0, points.size() - 1);
+	}
+
+	PriorityQueue<Point> divide(int size_x, int size_y, Vector<Point> points, int lower, int upper) {
+		int size = upper - lower + 1; // + 1 because converting last index to size?
+
+		if (size > 2) {
+			int mid = lower + size / 2;
+			PriorityQueue<Point> leftRegion = divide(size_x, size_y, points, lower, mid - 1);
+			PriorityQueue<Point> rightRegion = divide(size_x, size_y, points, mid, upper);
+			return stitch(size_x, size_y, points, leftRegion, rightRegion);
+		} else {
+			// base case
+			if (size == 2) {
+				// draw a line
+				Point p1 = points.elementAt(lower); // this could create a case where lowest point and highest point get
+																// used?
+				Point p2 = points.elementAt(upper);
+
+				Line bisector = bisectorLine(size_x, size_y, p1, p2);
+
+				// swap attempts to sort regions by y value, but doesn't scale past regions of
+				// size 2. thats why it was failing after 4. Priority queue solves this issue by
+				// putting whole region in sorted by y
+				// if (p2.y < p1.y) {
+				// // swap to sort
+				// Collections.swap(points, lower, upper);
+				// }
+				// p1 = points.elementAt(lower);
+				// p1.insertLine(bisector);
+
+				PriorityQueue<Point> newRegion = new PriorityQueue<Point>();
+				newRegion.add(p1);
+				newRegion.add(p2);
+
+				newRegion.peek().insertLine(bisector);
+
+				return newRegion;
+
+			}
+
+		}
+		PriorityQueue<Point> newRegion = new PriorityQueue<Point>();
+		newRegion.add(points.elementAt(lower));
+		return newRegion;
+	}
+
+	// Check all lines for this point and return the one with the closest
+	// intersection from the bisector's source
+	private double[] findItx(Point p1, Line bisector, double srcX, double srcY) {
+		double[] itx = null;
+		double dist = Double.MAX_VALUE;
+		int i = 0;
+		for (Line line : p1.lines) {
+			double[] temp = intersect(bisector, line);
+			if (temp != null) {
+				double distTemp = distance(temp[0], temp[1], srcX, srcY);
+
+				if (distTemp < dist) {
+					itx = new double[3];
+					itx[0] = temp[0];
+					itx[1] = temp[1];
+					itx[2] = i;
+					dist = distTemp;
+
+				}
+			}
+
+			i++;
+		}
+
+		return itx;
+	}
+
+	private PriorityQueue<Point> stitch(int size_x, int size_y, Vector<Point> points,
+			PriorityQueue<Point> leftRegion, PriorityQueue<Point> rightRegion) {
+
+		// prepare newly stitched region before we pick from left and right
+		PriorityQueue<Point> wholeRegion = new PriorityQueue<>();
+		wholeRegion.addAll(leftRegion);
+		wholeRegion.addAll(rightRegion);
+
+		// choose the lowest point from left and right.
+		Point p1 = leftRegion.poll();
+		Point p2 = rightRegion.poll();
+
+		double srcX = 0.0;
+		double srcY = 0.0;
+		double endX = 0.0;
+		double endY = 0.0;
+
+		do {
+			// 1. get a bisector line between them.
+			Line bisector = bisectorLine(size_x, size_y, p1, p2);
+
+			// 2. adjust the src point
+			srcX = (endX == 0.0 && endY == 0.0) ? ((bisector.y1 < bisector.y2) ? bisector.x1 : bisector.x2) : endX;
+			srcY = (endX == 0.0 && endY == 0.0) ? ((bisector.y1 < bisector.y2) ? bisector.y1 : bisector.y2) : endY;
+
+			// 3. compute the intersect with the bottom voronoi edges. ISSUE HERE! This does
+			// not find bottom voronoi edges, just bottom edge of two involved poitns
+			// hopefully the priority queue will fix this issue
+
+			double[] its1 = findItx(p1, bisector, srcX, srcY);
+			double[] its2 = findItx(p2, bisector, srcX, srcY);
+
+			// 4. find which of the two intersects with the bisector line is closer to the
+			// source point
+			double dist1 = (its1 != null) ? distance(its1[0], its1[1], srcX, srcY) : Double.MAX_VALUE;
+			double dist2 = (its2 != null) ? distance(its2[0], its2[1], srcX, srcY) : Double.MAX_VALUE;
+
+			System.out.println("dist1=" + dist1 + ", dist2=" + dist2);
+			if (its1 == null && its2 == null) {
+				endY = size_y;
+				endX = (endY - bisector.b) / bisector.a;
+			} else {
+				endX = (dist1 < dist2) ? its1[0] : its2[0];
+				endY = (dist1 < dist2) ? its1[1] : its2[1];
+			}
+
+			// 5. cut off the bisector line to the last intersection
+			bisector.x1 = srcX;
+			bisector.y1 = srcY;
+			bisector.x2 = endX;
+			bisector.y2 = endY;
+			System.out.println("bisector line: [" + srcX + "," + srcY + "]-->[" + endX + "," + endY + "]");
+
+			// 6. cut off the voronoi edge at the intersection
+			if (its1 != null || its2 != null) {
+				if (dist1 < dist2) {
+					p1.lines.elementAt((int) its1[2]).x2 = endX;
+					p1.lines.elementAt((int) its1[2]).y2 = endY;
+				} else {
+					p2.lines.elementAt((int) its2[2]).x1 = endX;
+					p2.lines.elementAt((int) its2[2]).y1 = endY;
+				}
+			}
+
+			// 7. choose the next point from the same side that keeps the last voronoi edge
+			if (dist1 < dist2) {
+				p1.insertLine(bisector);
+				if (leftRegion.isEmpty()) {
+					break;
+				}
+				p1 = leftRegion.poll();
+			} else {
+				p2.insertLine(bisector);
+				if (rightRegion.isEmpty()) {
+					break;
+				}
+				p2 = rightRegion.poll();
+			}
+
+		} while (true);
+
+		return wholeRegion;
+	}
+
+	private Line bisectorLine(int size_x, int size_y, Point p1, Point p2) {
+
+		// int mid_x = Math.abs(p1.x + p2.x) / 2; // abs necessary here?
+		// int mid_y = Math.abs(p1.y + p2.y) / 2; // removed abs()
+
+		int mid_x = Math.abs(p1.x + p2.x) / 2; // abs necessary here?
+		int mid_y = Math.abs(p1.y + p2.y) / 2; // removed abs()
+
+		double slope = (double) (p2.y - p1.y) / (double) (p2.x - p1.x); // danger of div by 0? since 2 points could have
+																								// same x axis
+		double perpendicular_slope = -1 / slope;
+
+		double intersect = mid_y - perpendicular_slope * mid_x;
+
+		// generate a bisector line
+		// compute x1, y1
+		double x1 = 0.0;
+		double y1 = intersect;
+		// compute x2, y2
+		double x2 = size_x;
+		double y2 = perpendicular_slope * x2 + intersect;
+
+		return new Line(x1, y1, x2, y2);
+	}
+
+	// https://stackoverflow.com/questions/16314069/calculation-of-intersections-between-line-segments
+	private double[] intersect(Line l1, Line l2) {
+		// a is slope
+		double a1 = (double) (l1.y2 - l1.y1) / (double) (l1.x2 - l1.x1);
+		double b1 = l1.y1 - a1 * l1.x1;
+
+		double a2 = (double) (l2.y2 - l2.y1) / (double) (l2.x2 - l2.x1);
+		double b2 = l2.y1 - a2 * l2.x1;
+
+		double[] i = new double[2];
+		i[0] = -(b1 - b2) / (a1 - a2);
+		i[1] = i[0] * a1 + b1;
+
+		// is the point within bounds of the line segments
+		if (!(Math.min(l1.x2, l2.x1) < i[0] && i[0] < Math.max(l1.x2, l1.x1))) {
+			return null;
+		}
+
+		return i;
+	}
+
+	private double distance(double x1, double y1, double x2, double y2) {
+		return Math.sqrt(Math.pow(x2 - x1, 2.0) + Math.pow(y2 - y1, 2.0));
+	}
+}
