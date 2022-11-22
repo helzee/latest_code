@@ -183,6 +183,7 @@ public class VoronoiDiagram {
 
 		double intersect = mid_y - perpendicular_slope * mid_x;
 
+		// extend bounds to infinite?
 		// generate a bisector line
 		// compute x1, y1
 		double x1 = 0.0;
