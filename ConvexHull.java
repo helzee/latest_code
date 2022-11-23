@@ -1,12 +1,8 @@
-import java.util.LinkedList;
-import java.util.ListIterator;
-import java.util.PriorityQueue;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.Vector;
 
-import javax.print.attribute.standard.PrinterMoreInfoManufacturer;
+import java.util.PriorityQueue;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.Vector;
 
 /**
  * This Convex Hull class is specific to the voronoi algorithm.
@@ -60,7 +56,7 @@ public class ConvexHull {
     * 
     * ALWAYS called merge from left convex hull.
     */
-   public Vector<PriorityQueue<Point>> merge(ConvexHull right) {
+   public Vector<Vector<Point>> merge(ConvexHull right) {
 
       // 1. find the lowest point of each convex hull. Choose the lowest one (and
       // leftmost if both are same height) as origin. remove the origin from its
@@ -116,7 +112,7 @@ public class ConvexHull {
       }
 
       // 3. Now that points are sorted. Run the graham algorithm.
-      Vector<PriorityQueue<Point>> res = graham(sortedPoints, rightMostX);
+      Vector<Vector<Point>> res = graham(sortedPoints, rightMostX);
       // add the origin to this convex hull
       this.points.add(0, origin);
       // Within the graham algorithm, store discarded points from each CH in their
@@ -127,22 +123,42 @@ public class ConvexHull {
 
       // go through the convex hull. add the bridge points.. points at the top and
       // bottom of each stitching
-      PriorityQueue<Point> leftStitching = res.get(0);
-      PriorityQueue<Point> rightStitching = res.get(1);
+      Vector<Point> leftStitching = res.get(0);
+      Vector<Point> rightStitching = res.get(1);
+
+      PriorityQueue<Point> leftBridge = new PriorityQueue<>();
+      PriorityQueue<Point> rightBridge = new PriorityQueue<>();
+
       for (int i = 1; i < points.size() + 1; i++) {
          Point a = points.get(i - 1);
          Point b = points.get(i % points.size());
          if (a.x <= rightMostX && b.x > rightMostX) {
             // point a is in left side and b is in right side
-            leftStitching.add(a);
-            rightStitching.add(b);
+            if (leftBridge.peek() != a) {
+               leftBridge.add(a);
+            }
+            if (rightBridge.peek() != b) {
+               rightBridge.add(b);
+            }
+
          } else if (a.x > rightMostX && b.x <= rightMostX) {
             // point a is in right side and b is in left side
-            leftStitching.add(b);
-            rightStitching.add(a);
+            if (leftBridge.peek() != b) {
+               leftBridge.add(b);
+            }
+            if (rightBridge.peek() != a) {
+               rightBridge.add(a);
+            }
+
          }
       }
-      // corner case for stitching
+      // now the bridges are added to the end of the stitching. This represents the
+      // top of the stitching. We now need to move the lower bridge to the bottom of
+      // the stitching
+      leftStitching.add(0, leftBridge.poll());
+      leftStitching.add(leftBridge.poll());
+      rightStitching.add(0, rightBridge.poll());
+      rightStitching.add(rightBridge.poll());
 
       return res;
    }
@@ -157,9 +173,9 @@ public class ConvexHull {
     * @return two priority queues containing the discarded poitns from each side,
     *         sorted from lowest to highest
     */
-   private Vector<PriorityQueue<Point>> graham(PriorityQueue<Point> q, int leftSidesBoundary) {
-      PriorityQueue<Point> leftStitching = new PriorityQueue<Point>();
-      PriorityQueue<Point> rightStitching = new PriorityQueue<Point>();
+   private Vector<Vector<Point>> graham(PriorityQueue<Point> q, int leftSidesBoundary) {
+      Vector<Point> leftStitching = new Vector<Point>();
+      Vector<Point> rightStitching = new Vector<Point>();
       Vector<Point> hull = new Vector<Point>();
       Point last2 = null, last1 = null, next = null;
 
@@ -200,7 +216,7 @@ public class ConvexHull {
       // replace the old left side's convex hull with the new one
       this.points = hull;
 
-      Vector<PriorityQueue<Point>> res = new Vector<>();
+      Vector<Vector<Point>> res = new Vector<>();
       res.add(leftStitching);
       res.add(rightStitching);
       return res;

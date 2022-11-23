@@ -1,10 +1,6 @@
-import java.util.Collections;
+
 import java.util.Vector;
 import java.util.PriorityQueue;
-import java.util.Comparator;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.ListIterator;
 
 public class VoronoiDiagram {
 
@@ -79,14 +75,14 @@ public class VoronoiDiagram {
 	private ConvexHull stitch(int size_x, int size_y, Vector<Point> points,
 			ConvexHull leftConvexHull, ConvexHull rightConvexHull) {
 
-		Vector<PriorityQueue<Point>> stitching = leftConvexHull.merge(rightConvexHull);
+		Vector<Vector<Point>> stitching = leftConvexHull.merge(rightConvexHull);
 
-		PriorityQueue<Point> leftStitching = stitching.get(0);
-		PriorityQueue<Point> rightStitching = stitching.get(1);
+		Vector<Point> leftStitching = stitching.get(0);
+		Vector<Point> rightStitching = stitching.get(1);
 
 		// choose the lowest point from left and right.
-		Point p1 = leftStitching.poll();
-		Point p2 = rightStitching.poll();
+		Point p1 = leftStitching.remove(0);
+		Point p2 = rightStitching.remove(0);
 
 		double srcX = 0.0;
 		double srcY = 0.0;
@@ -161,10 +157,10 @@ public class VoronoiDiagram {
 			// 7. choose the next point from the same side that keeps the last voronoi edge
 			if (dist1 < dist2) {
 
-				p1 = leftStitching.poll();
+				p1 = leftStitching.remove(0);
 			} else {
 
-				p2 = rightStitching.poll();
+				p2 = rightStitching.remove(0);
 			}
 
 		} while (true);
@@ -186,8 +182,8 @@ public class VoronoiDiagram {
 		// extend bounds to infinite?
 		// generate a bisector line
 		// compute x1, y1
-		double x1 = 0.0;
-		double y1 = intersect;
+		double x1 = -1 * size_x;
+		double y1 = perpendicular_slope * x1 + intersect;
 		// compute x2, y2
 		double x2 = size_x;
 		double y2 = perpendicular_slope * x2 + intersect;
