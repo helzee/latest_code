@@ -1,7 +1,12 @@
 import java.util.LinkedList;
 import java.util.ListIterator;
+import java.util.PriorityQueue;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Iterator;
+import java.util.Vector;
+
+import javax.print.attribute.standard.PrinterMoreInfoManufacturer;
 
 /**
  * This Convex Hull class is specific to the voronoi algorithm.
@@ -10,57 +15,36 @@ import java.util.Iterator;
  */
 public class ConvexHull {
 
-   private class Node {
-      Node next = null;
-      Node prev = null;
-      Point point = null;
-
-      Node(Point p) {
-         point = p;
-      }
-   }
-
-   private final int PREV = 0;
-   private final int NEXT = 1;
-
-   // doubly linked list that stores points in convex hull. head of list is
+   // head of list is
    // bottom-most point of convex hull. The list iterates clockwise through the
    // hull with the last point in the list being counter-clockwise next to the
-   // first point
-   private Node bottomNode;
+   // bottom-most point
+   private Vector<Point> points;
 
    public ConvexHull(Point p) {
-      bottomNode = new Node(p);
-      bottomNode.prev = bottomNode;
-      bottomNode.next = bottomNode;
+
+      points = new Vector<Point>();
+      points.add(p);
 
    }
 
    // add points in correct order
    public ConvexHull(Point p1, Point p2) {
-      Node topNode;
+      points = new Vector<Point>();
       if (p1.y > p2.y) {
-         bottomNode = new Node(p2);
-         topNode = new Node(p1);
+         points.add(p2);
+         points.add(p1);
 
       } else {
-         bottomNode = new Node(p1);
-         topNode = new Node(p2);
+         points.add(p1);
+         points.add(p2);
 
       }
-      bottomNode.prev = topNode;
-      bottomNode.next = topNode;
-      topNode.prev = bottomNode;
-      topNode.next = bottomNode;
 
    }
 
    public Point getBottomPoint() {
-      return bottomNode.point;
-   }
-
-   public Node getBottom() {
-      return bottomNode;
+      return points.get(0);
    }
 
    /*
@@ -72,137 +56,218 @@ public class ConvexHull {
     * points into the stitching (Note: not
     * lowest to highest. sometimes the points removed can start higher than the
     * lowest point on the CH)
+    * The merge utilizes grahams algorithm
     * 
     * ALWAYS called merge from left convex hull.
     */
-   public ArrayList<LinkedList<Point>> merge(ConvexHull right) {
-      LinkedList<Point> leftStitching = new LinkedList<Point>();
-      LinkedList<Point> rightStitching = new LinkedList<Point>();
+   public Vector<PriorityQueue<Point>> merge(ConvexHull right) {
 
-      ConvexHull left = this;
-
-      // bottom most point of new merged convex hull
-      Node merged = null;
-
-      // use these nodes to create the new convex hull from left and right bottom
-      Node mergedRight = null;
-      Node mergedLeft = null;
-
-      // determine which Convex hull starts lower. The merged convex hull will start
-      // at the
-      // lowest point. Then find the lowest bridge between the two
-      if (left.getBottomPoint().y <= right.getBottomPoint().y) {
-         merged = mergedLeft = left.getBottom();
-         mergedRight = getCHBridge(right.getBottom(), mergedLeft.point, NEXT);
+      // 1. find the lowest point of each convex hull. Choose the lowest one (and
+      // leftmost if both are same height) as origin. remove the origin from its
+      // original convex hull
+      Point origin;
+      if (this.getBottomPoint().y <= right.getBottomPoint().y) {
+         origin = this.getBottomPoint();
 
       } else {
-         merged = mergedRight = right.getBottom();
-         mergedLeft = getCHBridge(left.getBottom(), mergedRight.point, PREV);
+         origin = right.getBottomPoint();
+
       }
 
-      Node topRight = mergedRight;
-      Node topLeft = mergedLeft;
+      // EDGE CASE: check if one of thte hulls is empty after getting origin
 
-      // find the top of each CH
-      while (topLeft.prev.point.y > topLeft.point.y) {
-         topLeft = topLeft.prev;
+      // 2. Sort all points based on their polar angle from the origin point.
+      // I created a comparator function in this function so that it can access the
+      // ORIGIN
+      PriorityQueue<Point> sortedPoints = new PriorityQueue<Point>((Point a, Point b) -> {
+         double distA = 0.0;
+         double distB = 0.0;
+         double polarA = polar_angle(origin, a, distA);
+         double polarB = polar_angle(origin, b, distB);
+         if (polarA < polarB) {
+            return -1;
+         } else if (polarA > polarB) {
+            return 1;
+         } else {
+            return distA < distB ? -1 : 1;
+         }
+      });
+      // As we sort points into priority queue, Track the leftmost and rightmost point
+      // coords of each CH.
+
+      int rightMostX = this.points.get(0).x;
+      for (Point p : this.points) {
+         if (p != origin) {
+            sortedPoints.add(p);
+         }
+
+         if (p.x > rightMostX) {
+            rightMostX = p.x;
+         }
       }
-      while (topRight.next.point.y > topRight.point.y) {
-         topRight = topRight.next;
+      int leftMostX = right.points.get(0).x;
+      for (Point p : right.points) {
+         if (p != origin) {
+            sortedPoints.add(p);
+         }
+         if (p.x < leftMostX) {
+            leftMostX = p.x;
+         }
       }
 
-      // find the top CH bridge (similar to finding the bottom one) it may not always
-      // be the topmost node of both CHs
-      if (topLeft.point.y >= topRight.point.y) {
-         topRight = getCHBridge(topRight, topLeft.point, PREV);
-      } else {
-         topLeft = getCHBridge(topLeft, topRight.point, NEXT);
+      // 3. Now that points are sorted. Run the graham algorithm.
+      Vector<PriorityQueue<Point>> res = graham(sortedPoints, rightMostX);
+      // add the origin to this convex hull
+      this.points.add(0, origin);
+      // Within the graham algorithm, store discarded points from each CH in their
+      // own priority queue ordered based on lowest y value. Return the new convex
+      // hull as a vector
+      // Replace this convex hull (the left one) with the new one. Return the two
+      // priority queues
+
+      // go through the convex hull. add the bridge points.. points at the top and
+      // bottom of each stitching
+      PriorityQueue<Point> leftStitching = res.get(0);
+      PriorityQueue<Point> rightStitching = res.get(1);
+      for (int i = 1; i < points.size() + 1; i++) {
+         Point a = points.get(i - 1);
+         Point b = points.get(i % points.size());
+         if (a.x <= rightMostX && b.x > rightMostX) {
+            // point a is in left side and b is in right side
+            leftStitching.add(a);
+            rightStitching.add(b);
+         } else if (a.x > rightMostX && b.x <= rightMostX) {
+            // point a is in right side and b is in left side
+            leftStitching.add(b);
+            rightStitching.add(a);
+         }
       }
-
-      // We now now where the top and bottom bridges of the two convex hulls are. We
-      // can use this information to connect the two convex hulls and remove the inner
-      // points by iterating from bottom to top bridge
-
-      Node leftStitch = mergedLeft;
-      Node rightStitch = mergedRight;
-
-      while (leftStitch != topLeft) {
-         leftStitching.add(leftStitch.point);
-         leftStitch = leftStitch.next;
-      }
-      leftStitching.add(leftStitch.point); // top node
-
-      while (rightStitch != topRight) {
-         rightStitching.add(rightStitch.point);
-         rightStitch = rightStitch.prev;
-      }
-      rightStitching.add(rightStitch.point); // top node
-
-      // we now know all the nodes to discard and return as stitching. Now just merged
-      // the two outer convex hull portions and the bridges
-
-      mergedRight.prev = mergedLeft;
-      mergedLeft.next = mergedRight;
-      topRight.next = topLeft;
-      topLeft.prev = topRight;
-
-      ArrayList<LinkedList<Point>> res = new ArrayList<LinkedList<Point>>(2);
-      res.add(leftStitching);
-      res.add(rightStitching);
-
-      // left convex hull is now whole convex whole
-      bottomNode = merged;
+      // corner case for stitching
 
       return res;
-
    }
 
-   // finds the bridge of two convex hulls given an extreme point and an iterator
-   // to find the other convex hull's extreme point.
+   /**
+    * Performs the graham algorithm that scan all points from the bottom as
+    * revolving a line leftward and eliminating non-convex points.
+    *
+    * @param q             a priority queue of points sorted by polar angle from
+    *                      origin
+    * @param rightBoundary the rightmost point's xvalue in the left side
+    * @return two priority queues containing the discarded poitns from each side,
+    *         sorted from lowest to highest
+    */
+   private Vector<PriorityQueue<Point>> graham(PriorityQueue<Point> q, int leftSidesBoundary) {
+      PriorityQueue<Point> leftStitching = new PriorityQueue<Point>();
+      PriorityQueue<Point> rightStitching = new PriorityQueue<Point>();
+      Vector<Point> hull = new Vector<Point>();
+      Point last2 = null, last1 = null, next = null;
 
-   // Example: left extreme lower point and right variable point. Direction of
-   // bridge is NorthEast and positive. Therefore, we are looking for any points to
-   // the right of the variable point that minimize the slope of the bridge. We
-   // stop the moment
-   // we increase slope oft he bridge.
-
-   // we are always trying to minimize the absolute value of the slope.
-   private Node getCHBridge(Node variable, Point extreme, int direction) {
-
-      double slope = Math.abs(getSlope(variable.point, extreme));
-
-      while (true) {
-         double nextSlope = Math.abs(getSlope(variable.prev.point, extreme));
-         if (nextSlope >= slope) {
-            break;
-         }
-         slope = nextSlope;
-
-         if (direction == PREV) {
-            variable = variable.prev;
-         } else {
-            variable = variable.next;
-         }
-
+      // choose the first three points as convex-hull points.
+      for (int i = 0; i < 3 && q.size() > 0; i++) {
+         last2 = last1;
+         last1 = q.poll();
+         hull.add(last1);
+         // q.remove(0);
       }
 
-      return variable;
+      double prev_polar_angle = 0.0;
+      while (q.size() > 0) {
+         next = q.poll();
+
+         while ((prev_polar_angle = leftturn(last2, last1, next, prev_polar_angle)) < 0) {
+            // remove last1 that is no longer a convex point
+            Point removed = hull.remove(hull.size() - 1);
+            if (removed.x <= leftSidesBoundary) { // point belongs to left
+               leftStitching.add(removed);
+            } else {
+               rightStitching.add(removed);
+            }
+            if (hull.size() < 2) // check for excpetions
+               break;
+            // back-track to see previous points were actually concave.
+            last1 = hull.elementAt(hull.size() - 1);
+            last2 = hull.elementAt(hull.size() - 2);
+         }
+         // now advance to the next point.
+         last2 = hull.lastElement();
+         last1 = next;
+         hull.add(next);
+      }
+
+      q.addAll(hull);
+
+      // replace the old left side's convex hull with the new one
+      this.points = hull;
+
+      Vector<PriorityQueue<Point>> res = new Vector<>();
+      res.add(leftStitching);
+      res.add(rightStitching);
+      return res;
    }
 
-   private double getSlope(Point a, Point b) {
-      return (double) (b.y - a.y) / (double) (b.x - a.x);
+   /**
+    * Checks if B is hit by line that revolves left on A to B
+    *
+    * @param a the central point of a left-revovling line AC
+    * @param b the point to check
+    * @param c the destination to revolve line AC
+    * @param p a's polar angle
+    * @return b's polar angle if B is it by line AC that revolves left on A to B.
+    *         Otherwise -1
+    */
+   double leftturn(Point a, Point b, Point c, double pa) {
+      double distance = 0.0; // needed for polar_angle
+      double pb = polar_angle(a, b, distance);
+      double pc = polar_angle(a, c, distance);
+      return (pb > pa && pc > pb) ? pb : -1;
+   }
+
+   /**
+    * Computes the polar angle and distance between the origin o and the
+    * the other point p.
+    *
+    * @param o        the orign point
+    * @param p        the other point
+    * @param distance the distance between o and p (to be returned)
+    * @return the polar angle
+    */
+   public static double polar_angle(Point o, Point p, double distance) {
+      double radian;
+      double sin = 0.0;
+      double arcsin = 0.0;
+      if (o.x == p.x && o.y == p.y) {
+         distance = 0;
+         radian = 0;
+      } else {
+         int x = p.x - o.x;
+         int y = p.y - o.y;
+
+         distance = Math.sqrt(Math.pow(x, 2.0) +
+               Math.pow(y, 2.0));
+         sin = Math.abs(y / distance);
+         arcsin = Math.asin(sin);
+         if (x >= 0 && y >= 0) {
+            // NE [+x, +y] (0 - 89)
+            radian = arcsin;
+         } else if (x < 0 && y >= 0) {
+            // NW [-x, +y] (90 - 179)
+            radian = Math.PI - arcsin;
+         } else if (x < 0 && y < 0) {
+            // SW [-x, -y] (180 - 269)
+            radian = arcsin + Math.PI;
+         } else {
+            // SE [+x, -y] (270 - 359)
+            radian = Math.PI * 2 - arcsin;
+         }
+      }
+
+      return radian;
    }
 
    // WARNING this function alters the points by giving them lines not part of the
    // Voronoi diagram. This is only used for testing.
    public void draw() {
-      Node iterator = bottomNode;
-      do {
-
-         Point p = iterator.point;
-         p.insertLine(new Line(p, iterator.next.point));
-         iterator = iterator.next;
-      } while (iterator != bottomNode);
 
    }
 

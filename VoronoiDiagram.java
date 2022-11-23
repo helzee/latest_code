@@ -79,14 +79,14 @@ public class VoronoiDiagram {
 	private ConvexHull stitch(int size_x, int size_y, Vector<Point> points,
 			ConvexHull leftConvexHull, ConvexHull rightConvexHull) {
 
-		ArrayList<LinkedList<Point>> stitching = leftConvexHull.merge(rightConvexHull);
+		Vector<PriorityQueue<Point>> stitching = leftConvexHull.merge(rightConvexHull);
 
-		ListIterator<Point> leftStitching = stitching.get(0).listIterator();
-		ListIterator<Point> rightStitching = stitching.get(1).listIterator();
+		PriorityQueue<Point> leftStitching = stitching.get(0);
+		PriorityQueue<Point> rightStitching = stitching.get(1);
 
 		// choose the lowest point from left and right.
-		Point p1 = leftStitching.next();
-		Point p2 = rightStitching.next();
+		Point p1 = leftStitching.poll();
+		Point p2 = rightStitching.poll();
 
 		double srcX = 0.0;
 		double srcY = 0.0;
@@ -161,10 +161,10 @@ public class VoronoiDiagram {
 			// 7. choose the next point from the same side that keeps the last voronoi edge
 			if (dist1 < dist2) {
 
-				p1 = leftStitching.next();
+				p1 = leftStitching.poll();
 			} else {
 
-				p2 = rightStitching.next();
+				p2 = rightStitching.poll();
 			}
 
 		} while (true);
