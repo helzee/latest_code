@@ -1,5 +1,7 @@
 
 import java.util.Vector;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.PriorityQueue;
 
 public class VoronoiDiagram {
@@ -30,11 +32,10 @@ public class VoronoiDiagram {
 				Line bisector = bisectorLine(size_x, size_y, p1, p2);
 
 				// lower point always gets the new line
-				if (p1.y < p2.y) {
-					p1.insertLine(bisector);
-				} else {
-					p2.insertLine(bisector);
-				}
+
+				p1.insertLine(bisector);
+
+				p2.insertLine(bisector);
 
 				return new ConvexHull(p1, p2);
 
@@ -47,16 +48,17 @@ public class VoronoiDiagram {
 
 	// check the newest line for this point for an intersection
 	// if point has no line or no intersection found then return null
-	private double[] findItx(Point p1, Line bisector, double srcX, double srcY) {
+	private double[] findItx(Point p1, Line bisector, double srcX, double srcY, HashSet<Line> seenLines) {
 		double[] itx = null;
 		double dist = Double.MAX_VALUE;
 		int i = 0;
 		for (Line line : p1.lines) {
+
 			double[] temp = intersect(bisector, line);
 			if (temp != null) {
 				double distTemp = distance(temp[0], temp[1], srcX, srcY);
 
-				if (distTemp < dist) {
+				if (distTemp > 0.0 && distTemp < dist && !seenLines.contains(line)) {
 					itx = new double[3];
 					itx[0] = temp[0];
 					itx[1] = temp[1];
@@ -75,32 +77,66 @@ public class VoronoiDiagram {
 	private ConvexHull stitch(int size_x, int size_y, Vector<Point> points,
 			ConvexHull leftConvexHull, ConvexHull rightConvexHull) {
 
-		Vector<Vector<Point>> stitching = leftConvexHull.merge(rightConvexHull);
+		// we need to run a convex hull merge algorithm to find the starting and ending
+		// bridge
+		Vector<PriorityQueue<Point>> bridges = leftConvexHull.merge(rightConvexHull);
 
-		Vector<Point> leftStitching = stitching.get(0);
-		Vector<Point> rightStitching = stitching.get(1);
+		PriorityQueue<Point> leftBridge = bridges.get(0);
+		PriorityQueue<Point> rightBridge = bridges.get(1);
 
 		// choose the lowest point from left and right.
-		Point p1 = leftStitching.remove(0);
-		Point p2 = rightStitching.remove(0);
+		Point p1 = leftBridge.poll();
+		Point p2 = rightBridge.poll();
 
 		double srcX = 0.0;
 		double srcY = 0.0;
 		double endX = 0.0;
 		double endY = 0.0;
 
+		HashSet<Line> seenLines = new HashSet<>();
+		HashSet<Point> seenPoints = new HashSet<>();
+		seenPoints.add(p1);
+		seenPoints.add(p2);
+
+		Point upperLeftBridge = leftBridge.poll();
+		Point upperRightBridge = rightBridge.poll();
+		if (upperLeftBridge == null) {
+			upperLeftBridge = p1;
+		}
+		if (upperRightBridge == null) {
+			upperRightBridge = p2;
+		}
+
+		double maximumY = Math.max(upperLeftBridge.y, upperRightBridge.y);
+
 		do {
 			// 1. get a bisector line between them.
 			Line bisector = bisectorLine(size_x, size_y, p1, p2);
+
+			seenLines.add(bisector);
 
 			// 2. adjust the src point
 			srcX = (endX == 0.0 && endY == 0.0) ? ((bisector.y1 < bisector.y2) ? bisector.x1 : bisector.x2) : endX;
 			srcY = (endX == 0.0 && endY == 0.0) ? ((bisector.y1 < bisector.y2) ? bisector.y1 : bisector.y2) : endY;
 
+			if (p1 == upperLeftBridge && p2 == upperRightBridge) { // this means we have finished. extend the line to
+																						// infinity
+				if (bisector.y1 < bisector.y2) {
+					bisector.y1 = srcY;
+					bisector.x1 = srcX;
+				} else {
+					bisector.x2 = srcX;
+					bisector.y2 = srcX;
+				}
+				p1.insertLine(bisector);
+				p2.insertLine(bisector);
+				break;
+			}
+
 			// 3. compute the intersect with the bottom voronoi edges.
 
-			double[] its1 = findItx(p1, bisector, srcX, srcY);
-			double[] its2 = findItx(p2, bisector, srcX, srcY);
+			double[] its1 = findItx(p1, bisector, srcX, srcY, seenLines);
+			double[] its2 = findItx(p2, bisector, srcX, srcY, seenLines);
 
 			// 4. find which of the two intersects with the bisector line is closer to the
 			// source point
@@ -127,26 +163,58 @@ public class VoronoiDiagram {
 			System.out.println("bisector line: [" + srcX + "," + srcY + "]-->[" + endX + "," + endY + "]");
 
 			// 6. cut off the voronoi edge at the intersection
+			// cut off the left side of the edge if it belongs to the right region and vice
+			// versa
 			if (its1 != null || its2 != null) {
-				if (dist1 < dist2) {
-					p1.lines.elementAt((int) its1[2]).x2 = endX;
-					p1.lines.elementAt((int) its1[2]).y2 = endY;
-					// the line is now bounded at this point
+				if (dist1 < dist2) { // left side .. cut off right side of line
 
-				} else {
-					p2.lines.elementAt((int) its2[2]).x1 = endX;
-					p2.lines.elementAt((int) its2[2]).y1 = endY;
+					Line l = p1.lines.elementAt((int) its1[2]);
+					if (its1[1] > maximumY) { // check if we are exiting upper bridge (special case)
+						// we need to cutoff the part of the line that goes to infinity
+						if (l.y1 > l.y2) {
+							l.x1 = endX;
+							l.y1 = endY;
+						} else {
+							l.x2 = endX;
+							l.y2 = endY;
+						}
+
+					} else if (l.x1 > l.x2) { // x1 is RIGHT side
+						l.x1 = endX;
+						l.y1 = endY;
+					} else { // x2 is right side
+						l.x2 = endX;
+						l.y2 = endY;
+					}
+
+				} else { // right side.. cut off left side of line
+					Line l = p2.lines.elementAt((int) its2[2]);
+					if (its2[1] > maximumY) { // check if we are exiting upper bridge (special case)
+						// we need to cutoff the part of the line that goes to infinity
+						if (l.y1 > l.y2) {
+							l.x1 = endX;
+							l.y1 = endY;
+						} else {
+							l.x2 = endX;
+							l.y2 = endY;
+						}
+					} else if (l.x1 < l.x2) { // x1 is left side
+						l.x1 = endX;
+						l.y1 = endY;
+					} else { // x2 is left side
+						l.x2 = endX;
+						l.y2 = endY;
+					}
 
 				}
 
 			}
 
-			// give the new line to the lowest point
-			if (p1.y < p2.y) {
-				p1.insertLine(bisector);
-			} else {
-				p2.insertLine(bisector);
-			}
+			// give the new line to both points that share it
+
+			p1.insertLine(bisector);
+
+			p2.insertLine(bisector);
 
 			// as mentioned earlier, we have traversed both convex hulls if this is true.
 			// we finish up the new convex hull and give the bisector to the lower point
@@ -155,12 +223,27 @@ public class VoronoiDiagram {
 			}
 
 			// 7. choose the next point from the same side that keeps the last voronoi edge
+			// this point should be bisected by the line last intersected
 			if (dist1 < dist2) {
+				Line l = p1.lines.elementAt((int) its1[2]);
+				seenLines.add(l);
+				if (l.p1 != p1 && !seenPoints.contains(l.p1)) {
+					p1 = l.p1;
+					seenPoints.add(p1);
+				} else {
+					p1 = l.p2;
+				}
 
-				p1 = leftStitching.remove(0);
 			} else {
+				Line l = p2.lines.elementAt((int) its2[2]);
+				seenLines.add(l);
+				if (l.p2 != p2 && !seenPoints.contains(l.p2)) {
+					p2 = l.p2;
+					seenPoints.add(p2);
+				} else {
+					p2 = l.p1;
+				}
 
-				p2 = rightStitching.remove(0);
 			}
 
 		} while (true);
@@ -188,7 +271,7 @@ public class VoronoiDiagram {
 		double x2 = size_x;
 		double y2 = perpendicular_slope * x2 + intersect;
 
-		return new Line(x1, y1, x2, y2);
+		return new Line(x1, y1, x2, y2, p1, p2);
 	}
 
 	private double[] intersect(Line l1, Line l2) {
@@ -204,9 +287,10 @@ public class VoronoiDiagram {
 		i[1] = i[0] * a1 + b1;
 
 		// is the point within bounds of the line segments
-		if (!(Math.min(l1.x2, l2.x1) < i[0] && i[0] < Math.max(l1.x2, l1.x1))) {
+		if (!l1.inXBounds(i[0]) || !l2.inXBounds(i[0])) {
 			return null;
 		}
+
 		return i;
 	}
 

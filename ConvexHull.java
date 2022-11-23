@@ -56,7 +56,7 @@ public class ConvexHull {
     * 
     * ALWAYS called merge from left convex hull.
     */
-   public Vector<Vector<Point>> merge(ConvexHull right) {
+   public Vector<PriorityQueue<Point>> merge(ConvexHull right) {
 
       // 1. find the lowest point of each convex hull. Choose the lowest one (and
       // leftmost if both are same height) as origin. remove the origin from its
@@ -112,7 +112,7 @@ public class ConvexHull {
       }
 
       // 3. Now that points are sorted. Run the graham algorithm.
-      Vector<Vector<Point>> res = graham(sortedPoints, rightMostX);
+      graham(sortedPoints, rightMostX);
       // add the origin to this convex hull
       this.points.add(0, origin);
       // Within the graham algorithm, store discarded points from each CH in their
@@ -123,8 +123,6 @@ public class ConvexHull {
 
       // go through the convex hull. add the bridge points.. points at the top and
       // bottom of each stitching
-      Vector<Point> leftStitching = res.get(0);
-      Vector<Point> rightStitching = res.get(1);
 
       PriorityQueue<Point> leftBridge = new PriorityQueue<>();
       PriorityQueue<Point> rightBridge = new PriorityQueue<>();
@@ -155,17 +153,11 @@ public class ConvexHull {
       // now the bridges are added to the end of the stitching. This represents the
       // top of the stitching. We now need to move the lower bridge to the bottom of
       // the stitching
-      leftStitching.add(0, leftBridge.poll());
-      if (!leftBridge.isEmpty()) {
-         leftStitching.add(leftBridge.poll());
-      }
+      Vector<PriorityQueue<Point>> bridges = new Vector<>();
+      bridges.add(leftBridge);
+      bridges.add(rightBridge);
 
-      rightStitching.add(0, rightBridge.poll());
-      if (!rightBridge.isEmpty()) {
-         rightStitching.add(rightBridge.poll());
-      }
-
-      return res;
+      return bridges;
    }
 
    /**
@@ -178,13 +170,10 @@ public class ConvexHull {
     * @return two priority queues containing the discarded poitns from each side,
     *         sorted from lowest to highest
     */
-   private Vector<Vector<Point>> graham(PriorityQueue<Point> q, int leftSidesBoundary) {
-      Vector<Point> leftStitching = new Vector<Point>();
-      Vector<Point> rightStitching = new Vector<Point>();
+   void graham(PriorityQueue<Point> q, int leftSidesBoundary) {
+
       Vector<Point> hull = new Vector<Point>();
-      Vector<Vector<Point>> res = new Vector<>();
-      res.add(leftStitching);
-      res.add(rightStitching);
+
       Point last2 = null, last1 = null, next = null;
 
       // choose the first three points as convex-hull points.
@@ -201,17 +190,7 @@ public class ConvexHull {
 
          while ((prev_polar_angle = leftturn(last2, last1, next, prev_polar_angle)) < 0) {
             // remove last1 that is no longer a convex point
-            Point removed = hull.remove(hull.size() - 1);
-            if (removed != null) {
-               // NOTE: we add the right stitching to the beginning of the list while we add
-               // the left stitching to the end. This is due to the clockwise traversal of the
-               // points.
-               if (removed.x <= leftSidesBoundary) { // point belongs to left
-                  leftStitching.add(removed);
-               } else {
-                  rightStitching.add(0, removed);
-               }
-            }
+            hull.remove(hull.size() - 1);
 
             if (hull.size() < 2) // check for excpetions
                break;
@@ -230,7 +209,6 @@ public class ConvexHull {
       // replace the old left side's convex hull with the new one
       this.points = hull;
 
-      return res;
    }
 
    /**
