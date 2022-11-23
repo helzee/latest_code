@@ -156,9 +156,14 @@ public class ConvexHull {
       // top of the stitching. We now need to move the lower bridge to the bottom of
       // the stitching
       leftStitching.add(0, leftBridge.poll());
-      leftStitching.add(leftBridge.poll());
+      if (!leftBridge.isEmpty()) {
+         leftStitching.add(leftBridge.poll());
+      }
+
       rightStitching.add(0, rightBridge.poll());
-      rightStitching.add(rightBridge.poll());
+      if (!rightBridge.isEmpty()) {
+         rightStitching.add(rightBridge.poll());
+      }
 
       return res;
    }
@@ -177,6 +182,9 @@ public class ConvexHull {
       Vector<Point> leftStitching = new Vector<Point>();
       Vector<Point> rightStitching = new Vector<Point>();
       Vector<Point> hull = new Vector<Point>();
+      Vector<Vector<Point>> res = new Vector<>();
+      res.add(leftStitching);
+      res.add(rightStitching);
       Point last2 = null, last1 = null, next = null;
 
       // choose the first three points as convex-hull points.
@@ -194,11 +202,17 @@ public class ConvexHull {
          while ((prev_polar_angle = leftturn(last2, last1, next, prev_polar_angle)) < 0) {
             // remove last1 that is no longer a convex point
             Point removed = hull.remove(hull.size() - 1);
-            if (removed.x <= leftSidesBoundary) { // point belongs to left
-               leftStitching.add(removed);
-            } else {
-               rightStitching.add(removed);
+            if (removed != null) {
+               // NOTE: we add the right stitching to the beginning of the list while we add
+               // the left stitching to the end. This is due to the clockwise traversal of the
+               // points.
+               if (removed.x <= leftSidesBoundary) { // point belongs to left
+                  leftStitching.add(removed);
+               } else {
+                  rightStitching.add(0, removed);
+               }
             }
+
             if (hull.size() < 2) // check for excpetions
                break;
             // back-track to see previous points were actually concave.
@@ -216,9 +230,6 @@ public class ConvexHull {
       // replace the old left side's convex hull with the new one
       this.points = hull;
 
-      Vector<Vector<Point>> res = new Vector<>();
-      res.add(leftStitching);
-      res.add(rightStitching);
       return res;
    }
 
