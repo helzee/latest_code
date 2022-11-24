@@ -1,4 +1,5 @@
 import java.io.Serializable;
+import java.util.ConcurrentModificationException;
 
 public class Line {
     public static final double INFINITY = Double.MAX_VALUE;
@@ -35,6 +36,19 @@ public class Line {
 
     public boolean inXBounds(double x) {
         return x < Math.max(x1, x2) && x > Math.min(x1, x2);
+    }
+
+    // delete all references to this line
+    public void removeSelf() {
+
+        p1.lines.remove(this);
+        p2.lines.remove(this);
+
+    }
+
+    public void cutOffLines(int direction, Line cut, double exactCut) {
+        p1.cutOffLines(direction, cut, exactCut);
+        p2.cutOffLines(direction, cut, exactCut);
     }
 
 }

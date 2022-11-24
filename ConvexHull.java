@@ -2,6 +2,7 @@
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.Stack;
 import java.util.Vector;
 
 /**
@@ -16,6 +17,10 @@ public class ConvexHull {
    // hull with the last point in the list being counter-clockwise next to the
    // bottom-most point
    private Vector<Point> points;
+
+   public Vector<Point> getPoints() {
+      return points;
+   }
 
    public ConvexHull(Point p) {
 
@@ -56,7 +61,7 @@ public class ConvexHull {
     * 
     * ALWAYS called merge from left convex hull.
     */
-   public Vector<PriorityQueue<Point>> merge(ConvexHull right) {
+   public Vector<Stack<Point>> merge(ConvexHull right) {
 
       // 1. find the lowest point of each convex hull. Choose the lowest one (and
       // leftmost if both are same height) as origin. remove the origin from its
@@ -124,40 +129,83 @@ public class ConvexHull {
       // go through the convex hull. add the bridge points.. points at the top and
       // bottom of each stitching
 
-      PriorityQueue<Point> leftBridge = new PriorityQueue<>();
-      PriorityQueue<Point> rightBridge = new PriorityQueue<>();
+      Stack<Point> leftBridge = new Stack<>();
+
+      Stack<Point> rightBridge = new Stack<>();
 
       for (int i = 1; i < points.size() + 1; i++) {
          Point a = points.get(i - 1);
          Point b = points.get(i % points.size());
          if (a.x <= rightMostX && b.x > rightMostX) {
             // point a is in left side and b is in right side
-            if (leftBridge.peek() != a) {
+            if (leftBridge.isEmpty() || leftBridge.peek() != a) {
                leftBridge.add(a);
             }
-            if (rightBridge.peek() != b) {
+            if (rightBridge.isEmpty() || rightBridge.peek() != b) {
                rightBridge.add(b);
             }
 
          } else if (a.x > rightMostX && b.x <= rightMostX) {
             // point a is in right side and b is in left side
-            if (leftBridge.peek() != b) {
+            if (leftBridge.isEmpty() || leftBridge.peek() != b) {
                leftBridge.add(b);
             }
-            if (rightBridge.peek() != a) {
+            if (rightBridge.isEmpty() || rightBridge.peek() != a) {
                rightBridge.add(a);
             }
 
          }
       }
+
+      organizeBridges(leftBridge, rightBridge);
+
       // now the bridges are added to the end of the stitching. This represents the
       // top of the stitching. We now need to move the lower bridge to the bottom of
       // the stitching
-      Vector<PriorityQueue<Point>> bridges = new Vector<>();
+      Vector<Stack<Point>> bridges = new Vector<>();
       bridges.add(leftBridge);
       bridges.add(rightBridge);
 
       return bridges;
+   }
+
+   // we want the bottommost entrance to the convex hull to be at position 0
+   private static void organizeBridges(Stack<Point> leftBridge, Stack<Point> rightBridge) {
+      Point botLeft = leftBridge.get(0);
+      Point botRight = rightBridge.get(0);
+      if (leftBridge.size() > 1) {
+         if (leftBridge.get(0).y < leftBridge.get(1).y) {
+            botLeft = leftBridge.get(0);
+         } else {
+            botLeft = leftBridge.get(1);
+         }
+      }
+
+      if (rightBridge.size() > 1) {
+         if (rightBridge.get(0).y < rightBridge.get(1).y) {
+            botRight = rightBridge.get(0);
+         } else {
+            botRight = rightBridge.get(1);
+         }
+      }
+
+      if (botLeft.y <= botRight.y && botLeft != leftBridge.get(0)) {
+         swap(leftBridge);
+         swap(rightBridge);
+
+      } else if (botRight != rightBridge.get(0)) {
+         swap(leftBridge);
+         swap(rightBridge);
+      }
+   }
+
+   private static void swap(Stack<Point> stack) {
+      if (stack.size() < 2) {
+         return;
+      }
+      Point temp = stack.get(0);
+      stack.set(0, stack.get(1));
+      stack.set(1, temp);
    }
 
    /**
