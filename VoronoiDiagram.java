@@ -49,34 +49,27 @@ public class VoronoiDiagram {
 
 	// check the newest line for this point for an intersection
 	// if point has no line or no intersection found then return null
-	private double[] findItx(Line bisector, double srcX, double srcY, HashSet<Line> seenLines,
-			Vector<Point> convexHull) {
+	private double[] findItx(Point p1, Line bisector, double srcX, double srcY, HashSet<Line> seenLines) {
 		double[] itx = null;
 		double dist = Double.MAX_VALUE;
+		int i = 0;
+		for (Line line : p1.lines) {
 
-		int pointIndex = 0;
-		for (Point p1 : convexHull) {
-			int i = 0;
-			for (Line line : p1.lines) {
+			double[] temp = intersect(bisector, line);
+			if (temp != null) {
+				double distTemp = distance(temp[0], temp[1], srcX, srcY);
 
-				double[] temp = intersect(bisector, line);
-				if (temp != null) {
-					double distTemp = distance(temp[0], temp[1], srcX, srcY);
+				if (distTemp > 0.0 && distTemp < dist && !seenLines.contains(line)) {
+					itx = new double[3];
+					itx[0] = temp[0];
+					itx[1] = temp[1];
+					itx[2] = i;
+					dist = distTemp;
 
-					if (distTemp > 0.0 && distTemp < dist && !seenLines.contains(line)) {
-						itx = new double[4];
-						itx[0] = temp[0];
-						itx[1] = temp[1];
-						itx[2] = i;
-						dist = distTemp;
-						itx[3] = pointIndex;
-
-					}
 				}
-
-				i++;
 			}
-			pointIndex++;
+
+			i++;
 		}
 
 		return itx;
@@ -85,9 +78,6 @@ public class VoronoiDiagram {
 	private ConvexHull stitch(int size_x, int size_y, Vector<Point> points,
 			ConvexHull leftConvexHull, ConvexHull rightConvexHull) {
 
-		// these should not be altered by merge
-		Vector<Point> leftCH = leftConvexHull.getPoints();
-		Vector<Point> rightCH = rightConvexHull.getPoints();
 		// we need to run a convex hull merge algorithm to find the starting and ending
 		// bridge
 		Vector<Stack<Point>> bridges = leftConvexHull.merge(rightConvexHull);
@@ -121,6 +111,7 @@ public class VoronoiDiagram {
 		}
 
 		double maximumY = Math.max(upperLeftBridge.y, upperRightBridge.y);
+		double minimumY = Math.min(p1.y, p2.y);
 
 		do {
 			// 1. get a bisector line between them.
@@ -148,8 +139,8 @@ public class VoronoiDiagram {
 
 			// 3. compute the intersect with the bottom voronoi edges.
 
-			double[] its1 = findItx(bisector, srcX, srcY, seenLines, leftCH);
-			double[] its2 = findItx(bisector, srcX, srcY, seenLines, rightCH);
+			double[] its1 = findItx(p1, bisector, srcX, srcY, seenLines);
+			double[] its2 = findItx(p2, bisector, srcX, srcY, seenLines);
 
 			// 4. find which of the two intersects with the bisector line is closer to the
 			// source point
@@ -183,7 +174,7 @@ public class VoronoiDiagram {
 			if (its1 != null || its2 != null) {
 				if (dist1 < dist2) { // left side .. cut off right side of line
 
-					l = leftCH.get((int) its1[3]).lines.elementAt((int) its1[2]);
+					l = p1.lines.elementAt((int) its1[2]);
 
 					if (its1[1] > maximumY) { // check if we are exiting upper bridge (special case)
 						// we need to cutoff the part of the line that goes to infinity
@@ -193,6 +184,16 @@ public class VoronoiDiagram {
 						} else {
 							l.x2 = endX;
 							l.y2 = endY;
+						}
+
+					} else if (its1[1] < minimumY) { // check if we are entering lower bridge. cut off negative infinity
+																// section
+						if (l.y1 < l.y2) {
+							l.x1 = endX;
+							l.y1 = endY;
+						} else {
+							l.x2 = endX;
+							l.y2 = endX;
 						}
 
 					} else if (l.x1 > l.x2) { // x1 is RIGHT side
@@ -206,7 +207,7 @@ public class VoronoiDiagram {
 					}
 
 				} else { // right side.. cut off left side of line
-					l = rightCH.get((int) its2[3]).lines.elementAt((int) its2[2]);
+					l = p2.lines.elementAt((int) its2[2]);
 
 					if (its2[1] > maximumY) { // check if we are exiting upper bridge (special case)
 						// we need to cutoff the part of the line that goes to infinity
@@ -217,6 +218,16 @@ public class VoronoiDiagram {
 							l.x2 = endX;
 							l.y2 = endY;
 						}
+					} else if (its2[1] < minimumY) { // check if we are entering lower bridge. cut off negative infinity
+																// section
+						if (l.y1 < l.y2) {
+							l.x1 = endX;
+							l.y1 = endY;
+						} else {
+							l.x2 = endX;
+							l.y2 = endX;
+						}
+
 					} else if (l.x1 < l.x2) { // x1 is left side
 						l.cutOffLines(1, bisector, endX);
 						l.x1 = endX;
