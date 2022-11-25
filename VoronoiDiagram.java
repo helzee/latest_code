@@ -93,6 +93,9 @@ public class VoronoiDiagram {
 		Point p1 = leftBridge.remove(0);
 		Point p2 = rightBridge.remove(0);
 
+		Point bottomLeftBridge = p1;
+		Point bottomRightBridge = p2;
+
 		double srcX = 0.0;
 		double srcY = 0.0;
 		double endX = 0.0;
@@ -143,6 +146,15 @@ public class VoronoiDiagram {
 				p1.insertLine(bisector);
 				p2.insertLine(bisector);
 				break;
+			}
+			if (p1 != bottomRightBridge && p2 != bottomRightBridge) {
+				if (bisector.y1 < bisector.y2) {
+					bisector.x1 = srcX;
+					bisector.y1 = srcY;
+				} else {
+					bisector.x2 = srcX;
+					bisector.y2 = srcX;
+				}
 			}
 
 			// 3. compute the intersect with the bottom voronoi edges.
@@ -233,8 +245,8 @@ public class VoronoiDiagram {
 		} while (true);
 
 		// delete any lines from right side to the left of the stitch
-		checkForRemoval(stitch, leftRemovedLines, 2);
-		checkForRemoval(stitch, rightRemovedLines, 1);
+		checkForRemoval(stitch, leftRemovedLines, 2, seenLines);
+		checkForRemoval(stitch, rightRemovedLines, 1, seenLines);
 
 		for (Point p : seenPoints) {
 			p.applyStitching(stitch);
@@ -245,10 +257,13 @@ public class VoronoiDiagram {
 
 	// remove all lines in removedLines to the <right|left> of the stitch
 	// right = 2. left = 1
-	private void checkForRemoval(Vector<Line> stitch, Vector<Line> removedLines, int direction) {
+	private void checkForRemoval(Vector<Line> stitch, Vector<Line> removedLines, int direction,
+			HashSet<Line> seenLines) {
 
 		for (Line candidate : removedLines) {
-			candidate.removeSelf();
+			if (!seenLines.contains(candidate)) { // any lines the stitch crossed we dont wanna worry about
+				candidate.removeSelf();
+			}
 
 			// boolean isRemoved = true;
 			// for (Line stitching : stitch) {
