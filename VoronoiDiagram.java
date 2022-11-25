@@ -308,7 +308,7 @@ public class VoronoiDiagram {
 				l.y1 = endY;
 			} else {
 				l.x2 = endX;
-				l.y2 = endX;
+				l.y2 = endY;
 			}
 
 		} else {

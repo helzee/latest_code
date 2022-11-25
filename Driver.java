@@ -19,7 +19,7 @@ public class Driver {
 		}
 
 		// generate N points
-		Random rand = new Random(10);
+		Random rand = new Random(1); // 10
 		Vector<Point> points = new Vector<Point>();
 
 		// space should be always 1250 x 1250

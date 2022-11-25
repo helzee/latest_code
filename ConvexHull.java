@@ -197,6 +197,34 @@ public class ConvexHull {
          swap(leftBridge);
          swap(rightBridge);
       }
+
+      // special case for when 1 bridge is size 1 and other is size 2
+      if (leftBridge.size() == 1 && rightBridge.size() == 2) {
+         bridgeCaseOfThree(leftBridge, rightBridge);
+      } else if (leftBridge.size() == 2 && rightBridge.size() == 1) {
+         bridgeCaseOfThree(rightBridge, leftBridge);
+      }
+   }
+
+   private static void bridgeCaseOfThree(Stack<Point> smallBridge, Stack<Point> largeBridge) {
+      Point origin = smallBridge.peek();
+      PriorityQueue<Point> sortedPoints = new PriorityQueue<Point>((Point a, Point b) -> {
+         double distA = 0.0;
+         double distB = 0.0;
+         double polarA = polar_angle(origin, a, distA);
+         double polarB = polar_angle(origin, b, distB);
+         if (polarA < polarB) {
+            return -1;
+         } else if (polarA > polarB) {
+            return 1;
+         } else {
+            return distA < distB ? -1 : 1;
+         }
+      });
+      sortedPoints.add(largeBridge.pop());
+      sortedPoints.add(largeBridge.pop());
+      largeBridge.add(sortedPoints.poll());
+      largeBridge.add(sortedPoints.poll());
    }
 
    private static void swap(Stack<Point> stack) {
@@ -225,7 +253,7 @@ public class ConvexHull {
       Point last2 = null, last1 = null, next = null;
 
       // choose the first three points as convex-hull points.
-      for (int i = 0; i < 3 && q.size() > 0; i++) {
+      for (int i = 0; i < 2 && q.size() > 0; i++) {
          last2 = last1;
          last1 = q.poll();
          hull.add(last1);
