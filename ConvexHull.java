@@ -206,20 +206,25 @@ public class ConvexHull {
       }
    }
 
+   // in this special case, we want to find which of the two points from the larger
+   // bridge is closer to 90 degrees with respect to the single bridge point
+   // This is because it is already a given that the two large bridge points will
+   // both either be on the right or the left of the small bridge point
+   // The reason we need to do this calculation is because sometimes the top bridge
+   // in the scenario actually contains the lower point of the large bridge (
+   // because even though the point is lower, the bridge it creates is above that
+   // of the other point that is higher up )
+
+   // https://math.stackexchange.com/questions/707673/find-angle-in-degrees-from-one-point-to-another-in-2d-space
+
    private static void bridgeCaseOfThree(Stack<Point> smallBridge, Stack<Point> largeBridge) {
       Point origin = smallBridge.peek();
       PriorityQueue<Point> sortedPoints = new PriorityQueue<Point>((Point a, Point b) -> {
-         double distA = 0.0;
-         double distB = 0.0;
-         double polarA = polar_angle(origin, a, distA);
-         double polarB = polar_angle(origin, b, distB);
-         if (polarA < polarB) {
-            return -1;
-         } else if (polarA > polarB) {
-            return 1;
-         } else {
-            return distA < distB ? -1 : 1;
-         }
+         double angleA = Math.atan2(a.y - origin.y, a.x - origin.x);
+         double angleB = Math.atan2(b.y - origin.y, b.x - origin.x);
+         double diffA = Math.abs(angleA - (Math.PI / 2));
+         double diffB = Math.abs(angleB - (Math.PI / 2));
+         return diffA > diffB ? -1 : 1;
       });
       sortedPoints.add(largeBridge.pop());
       sortedPoints.add(largeBridge.pop());

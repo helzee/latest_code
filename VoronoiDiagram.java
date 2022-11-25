@@ -1,5 +1,6 @@
 
 import java.util.Vector;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.PriorityQueue;
@@ -8,6 +9,9 @@ import java.util.Stack;
 public class VoronoiDiagram {
 	private int size_x;
 	private int size_y;
+
+	private static final int RIGHT = 2;
+	private static final int LEFT = 1;
 
 	public VoronoiDiagram(int size_x, int size_y, Vector<Point> points) {
 		this.size_x = size_x;
@@ -121,8 +125,9 @@ public class VoronoiDiagram {
 		double minimumY = Math.min(p1.y, p2.y);
 
 		Vector<Line> stitch = new Vector<>();
-		Vector<Line> leftRemovedLines = new Vector<>();
-		Vector<Line> rightRemovedLines = new Vector<>();
+		// order removed lines from lowest upper Y value to highest
+		PriorityQueue<Line> leftRemovedLines = new PriorityQueue<Line>(Comparator.comparing(Line::getUpperY));
+		PriorityQueue<Line> rightRemovedLines = new PriorityQueue<Line>(Comparator.comparing(Line::getUpperY));
 
 		do {
 			// 1. get a bisector line between them.
@@ -257,39 +262,40 @@ public class VoronoiDiagram {
 
 	// remove all lines in removedLines to the <right|left> of the stitch
 	// right = 2. left = 1
-	private void checkForRemoval(Vector<Line> stitch, Vector<Line> removedLines, int direction,
+	private void checkForRemoval(Vector<Line> stitching, PriorityQueue<Line> removedLines, int direction,
 			HashSet<Line> seenLines) {
 
-		for (Line candidate : removedLines) {
-			if (!seenLines.contains(candidate)) { // any lines the stitch crossed we dont wanna worry about
+		Line candidate, stitch;
+		int stitchIndex = 0;
+		while (!removedLines.isEmpty()) {
+			candidate = removedLines.poll();
+			// if we saw the line that means it was intersected by a stitch and was already
+			// taken care of
+			if (seenLines.contains(candidate)) {
+				continue;
+			}
+			stitch = stitching.get(stitchIndex);
+
+			// get to the stitch section that is at the same level as the candidate line
+			while (!stitch.inYBounds(candidate.getUpperY())) {
+				stitchIndex++;
+				stitch = stitching.get(stitchIndex);
+			}
+
+			// check if any point on the candidate line is to the left/right of the stitch
+			// line
+			if (direction == RIGHT && candidate.x1 > Math.min(stitch.x1, stitch.x2)) {
+				candidate.removeSelf();
+			} else if (candidate.x1 < Math.max(stitch.x1, stitch.x2)) { // left
 				candidate.removeSelf();
 			}
 
-			// boolean isRemoved = true;
-			// for (Line stitching : stitch) {
-
-			// if (direction == 2) { // right
-			// if (!candidate.isRightOf(stitching)) {
-			// isRemoved = false;
-			// break;
-			// }
-
-			// } else {
-			// if (!candidate.isLeftOf(stitching)) {
-			// isRemoved = false;
-			// break;
-			// }
-			// }
-			// }
-			// if (isRemoved) {
-			// candidate.removeSelf();
-			// }
-
 		}
+
 	}
 
 	private void trim(Line l, Line bisector, double[] its,
-			double endX, double endY, double maximumY, double minimumY, int direction, Vector<Line> removedLines) {
+			double endX, double endY, double maximumY, double minimumY, int direction, PriorityQueue<Line> removedLines) {
 
 		if (its[1] > maximumY) { // check if we are exiting upper bridge (special case)
 			// we need to cutoff the part of the line that goes to infinity
@@ -342,23 +348,27 @@ public class VoronoiDiagram {
 
 	private Line bisectorLine(int size_x, int size_y, Point p1, Point p2) {
 
-		int mid_x = Math.abs(p1.x + p2.x) / 2;
-		int mid_y = Math.abs(p1.y + p2.y) / 2;
+		long mid_x = Math.abs(p1.x + p2.x) / 2; // we possibly truncate data here
+		long mid_y = Math.abs(p1.y + p2.y) / 2;
 
-		double slope = (double) (p2.y - p1.y) / (double) (p2.x - p1.x); // danger of div by 0? since 2 points could have
-																								// same x axis
-		double perpendicular_slope = -1 / slope;
+		// double slope = (double) (p2.y - p1.y) / (double) (p2.x - p1.x); // danger of
+		// div by 0? since 2 points could have
+		// same x axis
+		// double perpendicular_slope = -1 / slope;
 
-		double intersect = mid_y - perpendicular_slope * mid_x;
+		long perpendicular_slope_num = -1 * (p2.x - p1.x);
+		long perpendicular_slope_den = p2.y - p1.y;
+
+		long intersect = mid_y - (mid_x * perpendicular_slope_num) / perpendicular_slope_den;
 
 		// extend bounds to infinite?
 		// generate a bisector line
 		// compute x1, y1
-		double x1 = -1 * size_x;
-		double y1 = perpendicular_slope * x1 + intersect;
+		long x1 = -1 * size_x;
+		long y1 = (x1 * perpendicular_slope_num) / perpendicular_slope_den + intersect;
 		// compute x2, y2
-		double x2 = size_x;
-		double y2 = perpendicular_slope * x2 + intersect;
+		long x2 = size_x;
+		long y2 = (x2 * perpendicular_slope_num) / perpendicular_slope_den + intersect;
 
 		return new Line(x1, y1, x2, y2, p1, p2);
 	}

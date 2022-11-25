@@ -19,7 +19,7 @@ public class Driver {
 		}
 
 		// generate N points
-		Random rand = new Random(1); // 10
+		Random rand = new Random(2); // 10
 		Vector<Point> points = new Vector<Point>();
 
 		// space should be always 1250 x 1250
@@ -49,7 +49,7 @@ public class Driver {
 		graphics.start();
 
 		// generate a voronoi diagram
-		VoronoiDiagram voronoi = new VoronoiDiagram(50000, 50000, points);
+		VoronoiDiagram voronoi = new VoronoiDiagram(1250, 1250, points);
 
 	}
 }

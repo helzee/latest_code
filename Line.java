@@ -1,6 +1,7 @@
 import java.io.Serializable;
 import java.util.ConcurrentModificationException;
 import java.util.HashSet;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.Vector;
 
@@ -38,8 +39,16 @@ public class Line {
         p2 = b;
     }
 
+    public double getY1() {
+        return y1;
+    }
+
     public boolean inXBounds(double x) {
         return x < Math.max(x1, x2) && x > Math.min(x1, x2);
+    }
+
+    public boolean inYBounds(double y) {
+        return getLowerY() <= y && getUpperY() >= y;
     }
 
     // delete all references to this line
@@ -50,7 +59,7 @@ public class Line {
 
     }
 
-    public void cutOffLines(int direction, Line cut, double exactCut, Vector<Line> res) {
+    public void cutOffLines(int direction, Line cut, double exactCut, PriorityQueue<Line> res) {
 
         p1.cutOffLines(direction, cut, exactCut, res);
         p2.cutOffLines(direction, cut, exactCut, res);
@@ -65,6 +74,14 @@ public class Line {
     public boolean isLeftOf(Line line) {
         return proveDirection(line, LEFT);
 
+    }
+
+    public double getLowerY() {
+        return Math.min(y1, y2);
+    }
+
+    public double getUpperY() {
+        return Math.max(y1, y2);
     }
 
     public boolean isAbove(Line line) {

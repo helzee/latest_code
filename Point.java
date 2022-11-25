@@ -1,6 +1,7 @@
 
 import java.lang.Math;
 import java.util.HashSet;
+import java.util.PriorityQueue;
 import java.util.Stack;
 import java.util.Vector;
 
@@ -61,7 +62,7 @@ public class Point implements Comparable<Point> {
      * @param direction the side of the line that we cut off (1 = left, 2 = right)
      * @param cut       the line to determein where we make the cut
      */
-    public void cutOffLines(int direction, Line cut, double exactCut, Vector<Line> removedLines) {
+    public void cutOffLines(int direction, Line cut, double exactCut, PriorityQueue<Line> removedLines) {
 
         for (Line l : lines) {
             if (direction == 2) { // cutoff right side
