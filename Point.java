@@ -1,5 +1,6 @@
 
 import java.lang.Math;
+import java.util.HashSet;
 import java.util.Stack;
 import java.util.Vector;
 
@@ -60,13 +61,13 @@ public class Point implements Comparable<Point> {
      * @param direction the side of the line that we cut off (1 = left, 2 = right)
      * @param cut       the line to determein where we make the cut
      */
-    public void cutOffLines(int direction, Line cut, double exactCut) {
+    public void cutOffLines(int direction, Line cut, double exactCut, Vector<Line> removedLines) {
 
-        Vector<Line> removedLines = new Vector<>();
         for (Line l : lines) {
             if (direction == 2) { // cutoff right side
 
                 if (l.x1 > exactCut && l.x2 > exactCut) {
+
                     removedLines.add(l);
                 }
             } else {
@@ -78,13 +79,11 @@ public class Point implements Comparable<Point> {
             }
 
         }
-        for (Line l : removedLines) {
-            l.removeSelf();
-        }
 
     }
 
-    public void applyStitching() {
+    public void applyStitching(Vector<Line> stitch) {
+
         lines.addAll(stitching);
         stitching = new Stack<>();
     }

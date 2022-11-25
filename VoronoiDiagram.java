@@ -6,8 +6,12 @@ import java.util.PriorityQueue;
 import java.util.Stack;
 
 public class VoronoiDiagram {
+	private int size_x;
+	private int size_y;
 
 	public VoronoiDiagram(int size_x, int size_y, Vector<Point> points) {
+		this.size_x = size_x;
+		this.size_y = size_y;
 		divide(size_x, size_y, points, 0, points.size() - 1);
 	}
 
@@ -107,11 +111,15 @@ public class VoronoiDiagram {
 		}
 		if (!rightBridge.isEmpty()) {
 
-			upperLeftBridge = rightBridge.pop();
+			upperRightBridge = rightBridge.pop();
 		}
 
 		double maximumY = Math.max(upperLeftBridge.y, upperRightBridge.y);
 		double minimumY = Math.min(p1.y, p2.y);
+
+		Vector<Line> stitch = new Vector<>();
+		Vector<Line> leftRemovedLines = new Vector<>();
+		Vector<Line> rightRemovedLines = new Vector<>();
 
 		do {
 			// 1. get a bisector line between them.
@@ -168,78 +176,15 @@ public class VoronoiDiagram {
 
 			Line l = null;
 
-			// 6. cut off the voronoi edge at the intersection
-			// cut off the left side of the edge if it belongs to the right region and vice
-			// versa
-			if (its1 != null || its2 != null) {
-				if (dist1 < dist2) { // left side .. cut off right side of line
-
-					l = p1.lines.elementAt((int) its1[2]);
-
-					if (its1[1] > maximumY) { // check if we are exiting upper bridge (special case)
-						// we need to cutoff the part of the line that goes to infinity
-						if (l.y1 > l.y2) {
-							l.x1 = endX;
-							l.y1 = endY;
-						} else {
-							l.x2 = endX;
-							l.y2 = endY;
-						}
-
-					} else if (its1[1] < minimumY) { // check if we are entering lower bridge. cut off negative infinity
-																// section
-						if (l.y1 < l.y2) {
-							l.x1 = endX;
-							l.y1 = endY;
-						} else {
-							l.x2 = endX;
-							l.y2 = endX;
-						}
-
-					} else if (l.x1 > l.x2) { // x1 is RIGHT side
-						l.cutOffLines(2, bisector, endX);
-						l.x1 = endX;
-						l.y1 = endY;
-					} else { // x2 is right side
-						l.cutOffLines(2, bisector, endX);
-						l.x2 = endX;
-						l.y2 = endY;
-					}
-
-				} else { // right side.. cut off left side of line
-					l = p2.lines.elementAt((int) its2[2]);
-
-					if (its2[1] > maximumY) { // check if we are exiting upper bridge (special case)
-						// we need to cutoff the part of the line that goes to infinity
-						if (l.y1 > l.y2) {
-							l.x1 = endX;
-							l.y1 = endY;
-						} else {
-							l.x2 = endX;
-							l.y2 = endY;
-						}
-					} else if (its2[1] < minimumY) { // check if we are entering lower bridge. cut off negative infinity
-																// section
-						if (l.y1 < l.y2) {
-							l.x1 = endX;
-							l.y1 = endY;
-						} else {
-							l.x2 = endX;
-							l.y2 = endX;
-						}
-
-					} else if (l.x1 < l.x2) { // x1 is left side
-						l.cutOffLines(1, bisector, endX);
-						l.x1 = endX;
-						l.y1 = endY;
-					} else { // x2 is left side
-						l.cutOffLines(1, bisector, endX);
-						l.x2 = endX;
-						l.y2 = endY;
-					}
-
-				}
-
+			// 6. add any edges that may get trimmed or deleted by this stitch line.
+			// when the stitch line is complete, then we will look at all of these
+			// candidates and determine if they should be deleted.
+			if (dist1 < dist2 && its1 != null) {
+				l = p1.lines.elementAt((int) its1[2]);
+				trim(l, bisector, its1, endX, endY, maximumY, minimumY, 2, leftRemovedLines);
+			} else if (its2 != null) {
+				l = p2.lines.elementAt((int) its2[2]);
+				trim(l, bisector, its2, endX, endY, maximumY, minimumY, 1, rightRemovedLines);
 			}
 
 			// give the new line to both points that share it
@@ -247,6 +192,9 @@ public class VoronoiDiagram {
 			p1.addStitch(bisector);
 
 			p2.addStitch(bisector);
+
+			// track the stitchings
+			stitch.add(bisector);
 
 			// as mentioned earlier, we have traversed both convex hulls if this is true.
 			// we finish up the new convex hull and give the bisector to the lower point
@@ -278,17 +226,103 @@ public class VoronoiDiagram {
 					p2 = l.p1;
 
 				}
-				seenPoints.add(p1);
+				seenPoints.add(p2);
 
 			}
 
 		} while (true);
 
+		// delete any lines from right side to the left of the stitch
+		checkForRemoval(stitch, leftRemovedLines, 2);
+		checkForRemoval(stitch, rightRemovedLines, 1);
+
 		for (Point p : seenPoints) {
-			p.applyStitching();
+			p.applyStitching(stitch);
 		}
 
 		return leftConvexHull;
+	}
+
+	// remove all lines in removedLines to the <right|left> of the stitch
+	// right = 2. left = 1
+	private void checkForRemoval(Vector<Line> stitch, Vector<Line> removedLines, int direction) {
+
+		for (Line candidate : removedLines) {
+			candidate.removeSelf();
+
+			// boolean isRemoved = true;
+			// for (Line stitching : stitch) {
+
+			// if (direction == 2) { // right
+			// if (!candidate.isRightOf(stitching)) {
+			// isRemoved = false;
+			// break;
+			// }
+
+			// } else {
+			// if (!candidate.isLeftOf(stitching)) {
+			// isRemoved = false;
+			// break;
+			// }
+			// }
+			// }
+			// if (isRemoved) {
+			// candidate.removeSelf();
+			// }
+
+		}
+	}
+
+	private void trim(Line l, Line bisector, double[] its,
+			double endX, double endY, double maximumY, double minimumY, int direction, Vector<Line> removedLines) {
+
+		if (its[1] > maximumY) { // check if we are exiting upper bridge (special case)
+			// we need to cutoff the part of the line that goes to infinity
+			if (l.y1 > l.y2) {
+				l.x1 = endX;
+				l.y1 = endY;
+			} else {
+				l.x2 = endX;
+				l.y2 = endY;
+			}
+
+		} else if (its[1] < minimumY) { // check if we are entering lower bridge. cut off negative infinity
+													// section
+			if (l.y1 < l.y2) {
+				l.x1 = endX;
+				l.y1 = endY;
+			} else {
+				l.x2 = endX;
+				l.y2 = endX;
+			}
+
+		} else {
+			l.cutOffLines(direction, bisector, endX, removedLines);
+			if (direction == 2) {
+				if (l.x1 > l.x2) { // x1 is RIGHT side
+
+					l.x1 = endX;
+					l.y1 = endY;
+				} else { // x2 is right side
+
+					l.x2 = endX;
+					l.y2 = endY;
+				}
+			} else {
+
+				if (l.x1 < l.x2) { // x1 is left side
+
+					l.x1 = endX;
+					l.y1 = endY;
+				} else { // x2 is left side
+
+					l.x2 = endX;
+					l.y2 = endY;
+				}
+			}
+
+		}
+
 	}
 
 	private Line bisectorLine(int size_x, int size_y, Point p1, Point p2) {
