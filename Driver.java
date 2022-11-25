@@ -49,7 +49,7 @@ public class Driver {
 		graphics.start();
 
 		// generate a voronoi diagram
-		VoronoiDiagram voronoi = new VoronoiDiagram(1250, 1250, points);
+		VoronoiDiagram voronoi = new VoronoiDiagram(50000, 50000, points);
 
 	}
 }

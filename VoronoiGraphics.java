@@ -73,8 +73,8 @@ public class VoronoiGraphics implements Runnable {
 
             // draw this point
             g.setColor(ptColor);
-            g.drawOval(theInsets.left + p.x,
-                    theInsets.top + p.y,
+            g.drawOval(p.x,
+                    p.y,
                     1, 1);
 
             // draw this point's lines

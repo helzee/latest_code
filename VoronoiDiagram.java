@@ -348,27 +348,23 @@ public class VoronoiDiagram {
 
 	private Line bisectorLine(int size_x, int size_y, Point p1, Point p2) {
 
-		long mid_x = Math.abs(p1.x + p2.x) / 2; // we possibly truncate data here
-		long mid_y = Math.abs(p1.y + p2.y) / 2;
+		double mid_x = Math.abs(p1.x + p2.x) / 2;
+		double mid_y = Math.abs(p1.y + p2.y) / 2;
 
-		// double slope = (double) (p2.y - p1.y) / (double) (p2.x - p1.x); // danger of
-		// div by 0? since 2 points could have
-		// same x axis
-		// double perpendicular_slope = -1 / slope;
+		double slope = (double) (p2.y - p1.y) / (double) (p2.x - p1.x); // danger of div by 0? since 2 points could have
+																								// same x axis
+		double perpendicular_slope = -1 / slope;
 
-		long perpendicular_slope_num = -1 * (p2.x - p1.x);
-		long perpendicular_slope_den = p2.y - p1.y;
-
-		long intersect = mid_y - (mid_x * perpendicular_slope_num) / perpendicular_slope_den;
+		double intersect = mid_y - perpendicular_slope * mid_x;
 
 		// extend bounds to infinite?
 		// generate a bisector line
 		// compute x1, y1
-		long x1 = -1 * size_x;
-		long y1 = (x1 * perpendicular_slope_num) / perpendicular_slope_den + intersect;
+		double x1 = -1 * size_x;
+		double y1 = perpendicular_slope * x1 + intersect;
 		// compute x2, y2
-		long x2 = size_x;
-		long y2 = (x2 * perpendicular_slope_num) / perpendicular_slope_den + intersect;
+		double x2 = size_x;
+		double y2 = perpendicular_slope * x2 + intersect;
 
 		return new Line(x1, y1, x2, y2, p1, p2);
 	}
