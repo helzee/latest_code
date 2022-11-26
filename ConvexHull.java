@@ -1,4 +1,5 @@
 
+import java.util.HashSet;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.SortedSet;
@@ -96,28 +97,25 @@ public class ConvexHull {
       // As we sort points into priority queue, Track the leftmost and rightmost point
       // coords of each CH.
 
-      int rightMostX = this.points.get(0).x;
+      HashSet<Point> leftCH = new HashSet<>();
       for (Point p : this.points) {
          if (p != origin) {
             sortedPoints.add(p);
-         }
 
-         if (p.x > rightMostX) {
-            rightMostX = p.x;
          }
+         leftCH.add(p);
+
       }
-      int leftMostX = right.points.get(0).x;
+      HashSet<Point> rightCH = new HashSet<>();
       for (Point p : right.points) {
          if (p != origin) {
             sortedPoints.add(p);
          }
-         if (p.x < leftMostX) {
-            leftMostX = p.x;
-         }
+         rightCH.add(p);
       }
 
       // 3. Now that points are sorted. Run the graham algorithm.
-      graham(sortedPoints, rightMostX);
+      graham(sortedPoints);
       // add the origin to this convex hull
       this.points.add(0, origin);
       // Within the graham algorithm, store discarded points from each CH in their
@@ -136,7 +134,7 @@ public class ConvexHull {
       for (int i = 1; i < points.size() + 1; i++) {
          Point a = points.get(i - 1);
          Point b = points.get(i % points.size());
-         if (a.x <= rightMostX && b.x > rightMostX) {
+         if (leftCH.contains(a) && rightCH.contains(b)) {
             // point a is in left side and b is in right side
             if (leftBridge.isEmpty() || leftBridge.peek() != a) {
                leftBridge.add(a);
@@ -145,7 +143,7 @@ public class ConvexHull {
                rightBridge.add(b);
             }
 
-         } else if (a.x > rightMostX && b.x <= rightMostX) {
+         } else if (rightCH.contains(a) && leftCH.contains(b)) {
             // point a is in right side and b is in left side
             if (leftBridge.isEmpty() || leftBridge.peek() != b) {
                leftBridge.add(b);
@@ -251,7 +249,7 @@ public class ConvexHull {
     * @return two priority queues containing the discarded poitns from each side,
     *         sorted from lowest to highest
     */
-   void graham(PriorityQueue<Point> q, int leftSidesBoundary) {
+   void graham(PriorityQueue<Point> q) {
 
       Vector<Point> hull = new Vector<Point>();
 
